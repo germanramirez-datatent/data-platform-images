@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 
 import boto3
 import requests
@@ -25,7 +25,7 @@ def get_env_variables():
         "minio_access_key": os.environ["MINIO_ACCESS_KEY"],
         "minio_secret_key": os.environ["MINIO_SECRET_KEY"],
         "center_id": os.environ["CENTER_ID"],
-        "ingest_date": os.environ["INGEST_DATE"],
+        "ingest_date": os.environ.get("INGEST_DATE") or (date.today() - timedelta(days=1)).isoformat(),
     }
 
 
