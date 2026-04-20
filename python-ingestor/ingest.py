@@ -2,7 +2,6 @@ import json
 import logging
 import os
 from datetime import date
-from urllib.parse import urljoin
 
 import boto3
 import requests
