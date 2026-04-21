@@ -91,6 +91,11 @@ def upload_to_minio(s3_client, object_key: str, payload: dict) -> None:
     )
     logger.info("Upload completed for s3://%s/%s", RAW_BUCKET, object_key)
 
+def write_argo_output(object_key: str) -> None:
+    # writes output parameter for Argo to pass to next step
+    with open("/tmp/object_key.txt", "w") as f:
+        f.write(object_key)
+    logger.info("Wrote Argo output parameter: %s", object_key)
 
 def main() -> None:
     env = get_env_variables()
@@ -119,7 +124,8 @@ def main() -> None:
         secret_key=env["minio_secret_key"],
     )
     upload_to_minio(s3_client, object_key, payload)
-
+    write_argo_output(object_key)
+    
     logger.info("Traffic ingestion finished successfully")
     logger.info("Stored traffic data in s3://%s/%s", RAW_BUCKET, object_key)
 
