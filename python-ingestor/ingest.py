@@ -7,10 +7,6 @@ import boto3
 import requests
 from botocore.config import Config
 
-
-RAW_BUCKET = "raw"
-
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -21,9 +17,10 @@ logger = logging.getLogger(__name__)
 def get_env_variables():
     return {
         "simulation_api_url": os.environ["SIMULATION_API_URL"],
-        "minio_endpoint": os.environ["MINIO_ENDPOINT"],
-        "minio_access_key": os.environ["MINIO_ACCESS_KEY"],
-        "minio_secret_key": os.environ["MINIO_SECRET_KEY"],
+        "minio_endpoint": os.environ.get("MINIO_ENDPOINT", ""),
+        "aws_access_key": os.environ.get("AWS_ACCESS_KEY_ID", ""),
+        "aws_secret_key": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
+        "bucket": os.environ["RAW_BUCKET"],
         "center_id": os.environ["CENTER_ID"],
         "ingest_date": os.environ.get("INGEST_DATE") or (date.today() - timedelta(days=1)).isoformat(),
     }
@@ -71,25 +68,31 @@ def build_object_key(center_id: str, ingest_day: date) -> str:
 
 
 def create_s3_client(endpoint: str, access_key: str, secret_key: str):
-    return boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name="eu-west-1",
-        config=Config(s3={"addressing_style": "path"}),
-    )
+    if endpoint: 
+        return boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name="eu-west-1",
+            config=Config(s3={"addressing_style": "path"}),
+        )
+    else: 
+        return boto3.client(
+            "s3",
+            region_name="eu-west-1",
+        )
 
 
-def upload_to_minio(s3_client, object_key: str, payload: dict) -> None:
-    logger.info("Uploading payload to s3://%s/%s", RAW_BUCKET, object_key)
+def upload_to_minio(s3_client, bucket: str, object_key: str, payload: dict) -> None:
+    logger.info("Uploading payload to s3://%s/%s", bucket, object_key)
     s3_client.put_object(
-        Bucket=RAW_BUCKET,
+        Bucket=bucket,
         Key=object_key,
         Body=json.dumps(payload, indent=2).encode("utf-8"),
         ContentType="application/json",
     )
-    logger.info("Upload completed for s3://%s/%s", RAW_BUCKET, object_key)
+    logger.info("Upload completed for s3://%s/%s", bucket, object_key)
 
 def write_argo_output(object_key: str) -> None:
     # writes output parameter for Argo to pass to next step
@@ -101,10 +104,11 @@ def main() -> None:
     env = get_env_variables()
     ingest_day = parse_ingest_date(env["ingest_date"])
     logger.info(
-        "Starting traffic ingestion for center_id=%s ingest_date=%s minio_endpoint=%s",
+        "Starting traffic ingestion for center_id=%s ingest_date=%s bucket=%s storage_endpoint=%s",
         env["center_id"],
         env["ingest_date"],
-        env["minio_endpoint"],
+        env["bucket"],
+        env["minio_endpoint"] or "aws-s3",
     )
 
     payload = fetch_traffic_data(
@@ -120,14 +124,14 @@ def main() -> None:
     object_key = build_object_key(env["center_id"], ingest_day)
     s3_client = create_s3_client(
         endpoint=env["minio_endpoint"],
-        access_key=env["minio_access_key"],
-        secret_key=env["minio_secret_key"],
+        access_key=env["aws_access_key"],
+        secret_key=env["aws_secret_key"],
     )
-    upload_to_minio(s3_client, object_key, payload)
+    upload_to_minio(s3_client, env["bucket"], object_key, payload)
     write_argo_output(object_key)
     
     logger.info("Traffic ingestion finished successfully")
-    logger.info("Stored traffic data in s3://%s/%s", RAW_BUCKET, object_key)
+    logger.info("Stored traffic data in s3://%s/%s", env["bucket"], object_key)
 
 
 if __name__ == "__main__":
