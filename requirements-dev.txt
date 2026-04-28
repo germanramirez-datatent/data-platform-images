@@ -1,0 +1,5 @@
+-r data-quality/requirements.txt
+-r python-ingestor/requirements.txt
+-r simulation-api/requirements.txt
+
+pytest==8.3.5

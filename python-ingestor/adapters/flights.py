@@ -88,6 +88,7 @@ class FlightsAdapter(BaseAdapter):
         payload["source"] = self.source_name
         payload["ingest_date"] = ingest_day.isoformat()
         payload["snapshot_time"] = snapshot_timestamp
+        payload["total_records"] = len(payload.get("states") or [])
         return payload
 
     def build_object_key(self, ingest_day: date) -> str:

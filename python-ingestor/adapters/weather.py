@@ -26,6 +26,8 @@ class WeatherAdapter(BaseAdapter):
         response.raise_for_status()
         payload = response.json()
         payload["source"] = self.source_name
+        payload["ingest_date"] = ingest_day.isoformat()
+        payload["total_records"] = len(payload.get("hourly", {}).get("time", []))
         return payload
 
     def build_object_key(self, ingest_day: date) -> str:
