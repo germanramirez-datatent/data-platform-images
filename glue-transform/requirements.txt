@@ -1,0 +1,4 @@
+# Glue 4.0 provides all required dependencies:
+# - pyspark
+# - boto3
+# - awsglue
