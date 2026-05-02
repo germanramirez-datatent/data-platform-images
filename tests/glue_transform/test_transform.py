@@ -49,6 +49,15 @@ def test_build_paths_use_source_and_ingest_date():
     assert transform.build_output_path(args) == "s3://data-platform-dev-curated/curated/weather"
 
 
+def test_build_catalog_table_name_quotes_identifier_parts():
+    transform = importlib.import_module("transform")
+
+    assert (
+        transform.build_catalog_table_name("data-platform_dev_curated", "traffic")
+        == "`data-platform_dev_curated`.`traffic`"
+    )
+
+
 def test_get_job_args_requires_input_and_output_locations(monkeypatch):
     monkeypatch.delenv("RAW_BUCKET", raising=False)
     monkeypatch.delenv("CURATED_BUCKET", raising=False)

@@ -40,6 +40,7 @@ def get_job_args(argv: list[str]) -> dict[str, str]:
             "INPUT_PATH",
             "OUTPUT_PATH",
             "WRITE_MODE",
+            "CURATED_DATABASE",
         )
         if f"--{key}" in argv
     ]
@@ -73,6 +74,7 @@ def get_job_args(argv: list[str]) -> dict[str, str]:
         "input_path": resolved.get("INPUT_PATH") or os.environ.get("INPUT_PATH") or "",
         "output_path": resolved.get("OUTPUT_PATH") or os.environ.get("OUTPUT_PATH") or "",
         "write_mode": resolved.get("WRITE_MODE") or os.environ.get("WRITE_MODE") or "append",
+        "curated_database": resolved.get("CURATED_DATABASE") or os.environ.get("CURATED_DATABASE") or "data_platform_dev_curated",
     }
 
 
@@ -103,6 +105,14 @@ def build_output_path(args: dict[str, str]) -> str:
     return s3_path(args["curated_bucket"], "curated", args["source_name"])
 
 
+def quote_spark_identifier(identifier: str) -> str:
+    return f"`{identifier.replace('`', '``')}`"
+
+
+def build_catalog_table_name(database: str, table: str) -> str:
+    return ".".join(quote_spark_identifier(part) for part in (database, table))
+
+
 def main() -> None:
     from awsglue.context import GlueContext
     from awsglue.job import Job
@@ -127,11 +137,27 @@ def main() -> None:
     raw_df = reader.json(input_path)
     curated_df = transformer.transform(raw_df)
 
-    logger.info("Writing %s curated parquet to %s", transformer.source_name, output_path)
+    spark.conf.set(
+        "hive.metastore.client.factory.class",
+        "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory",
+    )
+
+    curated_database = args["curated_database"]
+    table_name = build_catalog_table_name(curated_database, args["source_name"])
+
+    logger.info(
+        "Writing %s curated parquet to %s as table %s",
+        transformer.source_name,
+        output_path,
+        table_name,
+    )
+
     (
-        curated_df.write.mode(args["write_mode"])
+        curated_df.write
+        .mode(args["write_mode"])
         .partitionBy(*transformer.partition_cols())
-        .parquet(output_path)
+        .option("path", output_path)
+        .saveAsTable(table_name)
     )
     job.commit()
     logger.info("%s transform finished successfully", transformer.source_name.capitalize())
