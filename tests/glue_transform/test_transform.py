@@ -71,11 +71,22 @@ def test_get_transformer_selects_source_strategy(monkeypatch):
     pyspark_module = types.ModuleType("pyspark")
     sql_module = types.ModuleType("pyspark.sql")
     functions_module = types.ModuleType("pyspark.sql.functions")
+    types_module = types.ModuleType("pyspark.sql.types")
     sql_module.DataFrame = object
     sql_module.functions = functions_module
+    for type_name in (
+        "ArrayType",
+        "BooleanType",
+        "IntegerType",
+        "StringType",
+        "StructField",
+        "StructType",
+    ):
+        setattr(types_module, type_name, object)
     monkeypatch.setitem(sys.modules, "pyspark", pyspark_module)
     monkeypatch.setitem(sys.modules, "pyspark.sql", sql_module)
     monkeypatch.setitem(sys.modules, "pyspark.sql.functions", functions_module)
+    monkeypatch.setitem(sys.modules, "pyspark.sql.types", types_module)
     monkeypatch.delitem(sys.modules, "transformers", raising=False)
 
     transformers = importlib.import_module("transformers")
