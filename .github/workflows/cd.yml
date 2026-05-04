@@ -3,6 +3,11 @@ name: CD
 on:
   push:
     branches: [main]
+    paths:
+      - 'simulation-api/**'
+      - 'python-ingestor/**'
+      - 'data-quality/**'
+      - 'glue-trigger/**'
 
 permissions:
   id-token: write
