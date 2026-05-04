@@ -1,0 +1,60 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REGISTRY: 811430801421.dkr.ecr.eu-west-1.amazonaws.com
+
+jobs:
+  push-images:
+    name: Build and push — ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    environment: dev  # requires manual approval from environment reviewers
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: simulation-api
+            context: simulation-api
+          - image: python-ingestor
+            context: python-ingestor
+          - image: data-quality
+            context: data-quality
+          - image: glue-trigger
+            context: glue-trigger
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.ECR_REGISTRY }}/data-platform/${{ matrix.image }}:dev-latest
+            ${{ env.ECR_REGISTRY }}/data-platform/${{ matrix.image }}:dev-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
